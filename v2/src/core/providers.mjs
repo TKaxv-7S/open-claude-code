@@ -167,6 +167,177 @@ const PROVIDERS = {
             return `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/anthropic/models/${model}:rawPredict`;
         },
     },
+
+    // Added in nightly sync v2.1.97
+    azure: {
+        name: 'Azure OpenAI',
+        endpoint: null, // Dynamic based on resource
+        envKey: 'AZURE_OPENAI_API_KEY',
+        authHeader(key) {
+            return {
+                'api-key': key,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['gpt-4o', 'gpt-35-turbo', 'gpt-4'],
+        getEndpoint(model, resource, deployment) {
+            return `https://${resource}.openai.azure.com/openai/deployments/${deployment}/chat/completions`;
+        },
+        // TODO: Add request/response transforms similar to OpenAI
+    },
+
+    // Added in nightly sync v2.1.97
+    cohere: {
+        name: 'Cohere',
+        endpoint: 'https://api.cohere.ai/v1/chat',
+        envKey: 'COHERE_API_KEY',
+        authHeader(key) {
+            return {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['command-r-plus', 'command-r', 'command'],
+        // TODO: Add request/response transforms
+    },
+
+    // Added in nightly sync v2.1.97
+    mistral: {
+        name: 'Mistral AI',
+        endpoint: 'https://api.mistral.ai/v1/chat/completions',
+        envKey: 'MISTRAL_API_KEY',
+        authHeader(key) {
+            return {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['mistral-large', 'mistral-medium', 'mistral-small'],
+        // TODO: Add request/response transforms similar to OpenAI
+    },
+
+    // Added in nightly sync v2.1.97
+    perplexity: {
+        name: 'Perplexity',
+        endpoint: 'https://api.perplexity.ai/chat/completions',
+        envKey: 'PERPLEXITY_API_KEY',
+        authHeader(key) {
+            return {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['llama-3.1-sonar-large-128k-online', 'llama-3.1-sonar-small-128k-online'],
+        // TODO: Add request/response transforms similar to OpenAI
+    },
+
+    // Added in nightly sync v2.1.97
+    together: {
+        name: 'Together AI',
+        endpoint: 'https://api.together.xyz/v1/chat/completions',
+        envKey: 'TOGETHER_API_KEY',
+        authHeader(key) {
+            return {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['meta-llama/Llama-2-70b-chat-hf', 'togethercomputer/RedPajama-INCITE-Chat-3B-v1'],
+        // TODO: Add request/response transforms similar to OpenAI
+    },
+
+    // Added in nightly sync v2.1.97
+    fireworks: {
+        name: 'Fireworks AI',
+        endpoint: 'https://api.fireworks.ai/inference/v1/chat/completions',
+        envKey: 'FIREWORKS_API_KEY',
+        authHeader(key) {
+            return {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['accounts/fireworks/models/llama-v3p1-70b-instruct', 'accounts/fireworks/models/mixtral-8x7b-instruct'],
+        // TODO: Add request/response transforms similar to OpenAI
+    },
+
+    // Added in nightly sync v2.1.97
+    groq: {
+        name: 'Groq',
+        endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+        envKey: 'GROQ_API_KEY',
+        authHeader(key) {
+            return {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['llama3-8b-8192', 'llama3-70b-8192', 'mixtral-8x7b-32768'],
+        // TODO: Add request/response transforms similar to OpenAI
+    },
+
+    // Added in nightly sync v2.1.97
+    huggingface: {
+        name: 'Hugging Face',
+        endpoint: 'https://api-inference.huggingface.co/models',
+        envKey: 'HF_TOKEN',
+        authHeader(key) {
+            return {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['microsoft/DialoGPT-large', 'facebook/blenderbot-400M-distill'],
+        getEndpoint(model) {
+            return `https://api-inference.huggingface.co/models/${model}`;
+        },
+        // TODO: Add request/response transforms
+    },
+
+    // Added in nightly sync v2.1.97
+    replicate: {
+        name: 'Replicate',
+        endpoint: 'https://api.replicate.com/v1/predictions',
+        envKey: 'REPLICATE_API_TOKEN',
+        authHeader(key) {
+            return {
+                'Authorization': `Token ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['meta/llama-2-70b-chat', 'stability-ai/stable-diffusion'],
+        // TODO: Add request/response transforms
+    },
+
+    // Added in nightly sync v2.1.97
+    anyscale: {
+        name: 'Anyscale',
+        endpoint: 'https://api.endpoints.anyscale.com/v1/chat/completions',
+        envKey: 'ANYSCALE_API_KEY',
+        authHeader(key) {
+            return {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['meta-llama/Llama-2-70b-chat-hf', 'codellama/CodeLlama-34b-Instruct-hf'],
+        // TODO: Add request/response transforms similar to OpenAI
+    },
+
+    // Added in nightly sync v2.1.97
+    deepseek: {
+        name: 'DeepSeek',
+        endpoint: 'https://api.deepseek.com/v1/chat/completions',
+        envKey: 'DEEPSEEK_API_KEY',
+        authHeader(key) {
+            return {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['deepseek-chat', 'deepseek-coder'],
+        // TODO: Add request/response transforms similar to OpenAI
+    },
 };
 
 /**
@@ -178,6 +349,16 @@ export function getProvider(model) {
     if (model.startsWith('claude') || model.startsWith('anthropic')) return PROVIDERS.anthropic;
     if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3')) return PROVIDERS.openai;
     if (model.startsWith('gemini')) return PROVIDERS.google;
+    // Added in nightly sync v2.1.97 - extended model detection
+    if (model.includes('azure')) return PROVIDERS.azure;
+    if (model.startsWith('command')) return PROVIDERS.cohere;
+    if (model.startsWith('mistral')) return PROVIDERS.mistral;
+    if (model.includes('sonar')) return PROVIDERS.perplexity;
+    if (model.includes('llama') || model.includes('RedPajama')) return PROVIDERS.together;
+    if (model.includes('mixtral') || model.includes('fireworks')) return PROVIDERS.fireworks;
+    if (model.includes('groq') || model.endsWith('-8192') || model.endsWith('-32768')) return PROVIDERS.groq;
+    if (model.includes('/')) return PROVIDERS.huggingface; // HF model format
+    if (model.startsWith('deepseek')) return PROVIDERS.deepseek;
     return PROVIDERS.anthropic; // default
 }
 
