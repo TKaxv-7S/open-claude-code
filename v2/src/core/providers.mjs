@@ -167,6 +167,139 @@ const PROVIDERS = {
             return `https://${region}-aiplatform.googleapis.com/v1/projects/${project}/locations/${region}/publishers/anthropic/models/${model}:rawPredict`;
         },
     },
+
+    // Added in nightly sync v2.1.104
+    azure: {
+        name: 'Azure OpenAI',
+        endpoint: null, // Dynamic based on resource
+        envKey: 'AZURE_OPENAI_API_KEY',
+        altEnvKey: 'AZURE_OPENAI_ENDPOINT',
+        authHeader(key) {
+            return {
+                'api-key': key,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['gpt-4o', 'gpt-4-turbo', 'gpt-35-turbo'],
+        getEndpoint(deploymentName, resourceName, apiVersion = '2024-02-01') {
+            return `https://${resourceName}.openai.azure.com/openai/deployments/${deploymentName}/chat/completions?api-version=${apiVersion}`;
+        },
+        transformRequest(body) {
+            // TODO: Implement Azure-specific request transform
+            return body;
+        },
+        transformResponse(data) {
+            // TODO: Implement Azure-specific response transform
+            return data;
+        },
+    },
+
+    // Added in nightly sync v2.1.104
+    cohere: {
+        name: 'Cohere',
+        endpoint: 'https://api.cohere.ai/v1/chat',
+        envKey: 'COHERE_API_KEY',
+        authHeader(key) {
+            return {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['command-r-plus', 'command-r', 'command-nightly'],
+        transformRequest(body) {
+            // TODO: Implement Cohere-specific request transform
+            return {
+                message: body.messages?.[body.messages.length - 1]?.content || '',
+                model: body.model,
+                ...(body.max_tokens && { max_tokens: body.max_tokens }),
+            };
+        },
+        transformResponse(data) {
+            // TODO: Implement Cohere-specific response transform
+            return {
+                content: [{ type: 'text', text: data.text || '' }],
+                stop_reason: 'end_turn',
+                usage: {
+                    input_tokens: data.meta?.tokens?.input_tokens || 0,
+                    output_tokens: data.meta?.tokens?.output_tokens || 0,
+                },
+            };
+        },
+    },
+
+    // Added in nightly sync v2.1.104
+    mistral: {
+        name: 'Mistral AI',
+        endpoint: 'https://api.mistral.ai/v1/chat/completions',
+        envKey: 'MISTRAL_API_KEY',
+        authHeader(key) {
+            return {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['mistral-large', 'mistral-medium', 'mistral-small', 'codestral-latest'],
+        transformRequest(body) {
+            // TODO: Implement Mistral-specific request transform
+            return {
+                model: body.model,
+                messages: body.messages || [],
+                ...(body.max_tokens && { max_tokens: body.max_tokens }),
+                ...(body.stream && { stream: true }),
+            };
+        },
+        transformResponse(data) {
+            // TODO: Implement Mistral-specific response transform
+            const choice = data.choices?.[0];
+            if (!choice) throw new Error('No choices in Mistral response');
+
+            return {
+                content: [{ type: 'text', text: choice.message?.content || '' }],
+                stop_reason: choice.finish_reason === 'stop' ? 'end_turn' : choice.finish_reason,
+                usage: {
+                    input_tokens: data.usage?.prompt_tokens || 0,
+                    output_tokens: data.usage?.completion_tokens || 0,
+                },
+            };
+        },
+    },
+
+    // Added in nightly sync v2.1.104
+    perplexity: {
+        name: 'Perplexity',
+        endpoint: 'https://api.perplexity.ai/chat/completions',
+        envKey: 'PERPLEXITY_API_KEY',
+        authHeader(key) {
+            return {
+                'Authorization': `Bearer ${key}`,
+                'Content-Type': 'application/json',
+            };
+        },
+        models: ['llama-3.1-sonar-small', 'llama-3.1-sonar-large', 'llama-3.1-70b-instruct'],
+        transformRequest(body) {
+            // TODO: Implement Perplexity-specific request transform
+            return {
+                model: body.model,
+                messages: body.messages || [],
+                ...(body.max_tokens && { max_tokens: body.max_tokens }),
+                ...(body.stream && { stream: true }),
+            };
+        },
+        transformResponse(data) {
+            // TODO: Implement Perplexity-specific response transform
+            const choice = data.choices?.[0];
+            if (!choice) throw new Error('No choices in Perplexity response');
+
+            return {
+                content: [{ type: 'text', text: choice.message?.content || '' }],
+                stop_reason: choice.finish_reason === 'stop' ? 'end_turn' : choice.finish_reason,
+                usage: {
+                    input_tokens: data.usage?.prompt_tokens || 0,
+                    output_tokens: data.usage?.completion_tokens || 0,
+                },
+            };
+        },
+    },
 };
 
 /**
@@ -178,6 +311,10 @@ export function getProvider(model) {
     if (model.startsWith('claude') || model.startsWith('anthropic')) return PROVIDERS.anthropic;
     if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3')) return PROVIDERS.openai;
     if (model.startsWith('gemini')) return PROVIDERS.google;
+    // Added in nightly sync v2.1.104
+    if (model.startsWith('command')) return PROVIDERS.cohere;
+    if (model.startsWith('mistral') || model.startsWith('codestral')) return PROVIDERS.mistral;
+    if (model.startsWith('llama-3.1-sonar')) return PROVIDERS.perplexity;
     return PROVIDERS.anthropic; // default
 }
 
