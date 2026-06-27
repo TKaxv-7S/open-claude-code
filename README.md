@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-1581_passing-brightgreen?style=flat-square" />
+  <img alt="Tests" src="https://img.shields.io/badge/tests-991_passing-brightgreen?style=flat-square" />
   <img alt="Tools" src="https://img.shields.io/badge/tools-25-blue?style=flat-square" />
   <img alt="Commands" src="https://img.shields.io/badge/commands-40-blue?style=flat-square" />
   <img alt="npm" src="https://img.shields.io/npm/v/@ruvnet/open-claude-code?style=flat-square&label=npm" />

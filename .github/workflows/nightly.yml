@@ -90,6 +90,7 @@ jobs:
       audit_clean: ${{ steps.audit.outputs.clean }}
       lint_clean: ${{ steps.lint.outputs.clean }}
       smoke_ok: ${{ steps.smoke.outputs.ok }}
+      optimize_smoke_ok: ${{ steps.optimize_smoke.outputs.ok }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -118,7 +119,7 @@ jobs:
           echo "${TEST_OUTPUT}"
 
           # Parse pass/fail counts from test output
-          # Format: "Tests: 904 total, 903 passed, 1 failed"
+          # Format: "Tests: 991 total, 991 passed, 0 failed"
           PASS_COUNT="$(echo "${TEST_OUTPUT}" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' | tail -1 || echo '0')"
           FAIL_COUNT="$(echo "${TEST_OUTPUT}" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+' | tail -1 || echo '0')"
 
@@ -232,6 +233,40 @@ jobs:
           echo "::error::CLI failed to start"
           exit 1
 
+      # Gate 5: Metaharness self-optimization layer smoke
+      # Verifies the hand-added optimize integration (v2/src/optimize/) is wired
+      # in and reachable every night. Additive + non-fatal if the feature is
+      # absent (e.g. wiped by a future upstream sync) — it warns instead of
+      # breaking the green pipeline, but flags the regression loudly.
+      - name: Optimize layer smoke test
+        id: optimize_smoke
+        working-directory: v2
+        run: |
+          if [ ! -d src/optimize ]; then
+            echo "::warning::v2/src/optimize/ is missing — metaharness self-optimization layer not present"
+            echo "ok=skipped" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          set +e
+          OPT_OUTPUT="$(timeout 15 node src/index.mjs optimize status 2>&1)"
+          OPT_EXIT=$?
+          set -e
+
+          echo "${OPT_OUTPUT}"
+
+          if [ "${OPT_EXIT}" -eq 0 ]; then
+            echo "::notice::optimize status passed (self-optimization layer wired in)"
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Present but not exiting 0 → integration regression. Warn loudly but
+          # do not block the verified release (fail-open to keep nightly green).
+          echo "::warning::optimize status exited ${OPT_EXIT} — self-optimization integration may be broken"
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          exit 0
+
   # ──────────────────────────────────────────────────────────────────
   # Phase 3: Decompile + Analyze — full rudevolution pipeline
   # ──────────────────────────────────────────────────────────────────
@@ -300,6 +335,14 @@ jobs:
           echo "::endgroup::"
 
       # ── Step 2: AI-powered analysis (uses decompile data) ──
+      # FOLLOW-UP (metaharness self-optimization, on-thesis): this step and
+      # scripts/auto-update-capabilities.mjs hardcode claude-sonnet-4. They could
+      # route through the cost-cascade concept in v2/src/optimize/ (cheap model
+      # first, escalate only if quality bar unmet) for ~5-10x cheaper discovery.
+      # Deferred deliberately — those scripts call the Anthropic API directly
+      # (not via the occ CLI router), so wiring the cascade is non-trivial and
+      # would touch the model call in the green release path. Tracked as a
+      # follow-up; not done here to keep the verified pipeline green.
       - name: Run AI discovery analysis
         id: ai_analysis
         env:

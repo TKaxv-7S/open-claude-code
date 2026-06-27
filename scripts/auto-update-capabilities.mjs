@@ -36,6 +36,39 @@ const DIFF_FILE = process.argv[2] || '/tmp/decompile-diff.json';
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-4-20250514';
 
+// ─── Protected integration: metaharness self-optimization layer ───
+//
+// The hand-added self-optimization layer lives in v2/src/optimize/ (never a
+// regeneration target) and is wired into a handful of upstream-shaped files via
+// small, opt-in guards. Some of those files (notably core/agent-loop.mjs and
+// ui/commands.mjs) ARE regeneration targets in mapToV2Files(), and a full-file
+// LLM regen can silently drop the wire-ins even when told not to. This map
+// records substrings that MUST survive in any regenerated copy of a protected
+// file; PROTECTED_PATHS lists directories the autoupdate must never touch.
+//
+// If a generated file is missing any of its markers, the update is rejected and
+// the original file is kept — the integration is never silently wiped.
+const OPTIMIZE_WIRE_INS = {
+  'v2/src/core/agent-loop.mjs': ['cascade', '_cascade'],
+  'v2/src/ui/commands.mjs': ['../optimize/store.mjs', '/optimize'],
+};
+
+// Directories the autoupdate is never allowed to create/modify/delete files in.
+const PROTECTED_PATHS = ['v2/src/optimize/'];
+
+function isProtectedPath(relFile) {
+  const norm = relFile.replace(/\\/g, '/');
+  return PROTECTED_PATHS.some((p) => norm === p.replace(/\/$/, '') || norm.startsWith(p));
+}
+
+// Returns the list of markers missing from `content` for `relFile`, or [] if
+// the file is not protected or all markers are present.
+function missingWireIns(relFile, content) {
+  const markers = OPTIMIZE_WIRE_INS[relFile.replace(/\\/g, '/')];
+  if (!markers || content == null) return [];
+  return markers.filter((m) => !content.includes(m));
+}
+
 if (!API_KEY) {
   console.error('ANTHROPIC_API_KEY required');
   process.exit(3);
@@ -170,7 +203,16 @@ function mapToV2Files(changes) {
     }
   }
 
-  return updates;
+  // Never let the autoupdate target the protected optimize layer.
+  const safe = updates.filter((u) => {
+    if (isProtectedPath(u.file)) {
+      console.error(`  Refusing to map update into protected path: ${u.file}`);
+      return false;
+    }
+    return true;
+  });
+
+  return safe;
 }
 
 // ─── Generate code updates via Claude ───
@@ -214,6 +256,9 @@ ${currentCode.slice(0, 8000)}
 5. Do NOT remove or change existing functionality
 6. Return ONLY the complete updated file content, no explanations
 7. If you can't determine specific changes, add reasonable stubs marked with TODO
+${(OPTIMIZE_WIRE_INS[update.file.replace(/\\/g, '/')] || []).length
+    ? `8. CRITICAL: this file contains the metaharness self-optimization wire-in. You MUST keep every reference to: ${OPTIMIZE_WIRE_INS[update.file.replace(/\\/g, '/')].map((m) => `\`${m}\``).join(', ')}. Removing any of them breaks the integration and the update will be rejected.`
+    : ''}
 
 Return the COMPLETE file content wrapped in a single code block:
 \`\`\`javascript
@@ -300,6 +345,12 @@ async function main() {
     try {
       const newCode = await generateUpdate(update, prevVersion, newVersion);
       if (newCode && newCode.length > 100) {
+        // Guard: never accept a regen that drops the optimize wire-in.
+        const dropped = missingWireIns(update.file, newCode);
+        if (dropped.length > 0) {
+          console.error(`  Rejected: ${update.file} — regen dropped optimize wire-in (${dropped.join(', ')}); keeping original`);
+          continue;
+        }
         fs.writeFileSync(filePath, newCode);
         applied.push(update);
         console.error(`  Applied: ${update.file}`);
@@ -333,6 +384,23 @@ async function main() {
       }
     }
 
+    console.error('All changes reverted. Release will proceed with existing code.');
+    process.exit(2);
+  }
+
+  // 7b. Final safety net: confirm the optimize wire-in survived on disk for
+  // every protected file. If anything is missing, revert and fail closed.
+  const wireInBroken = [];
+  for (const relFile of Object.keys(OPTIMIZE_WIRE_INS)) {
+    const onDisk = readFile(path.join(ROOT, relFile));
+    const dropped = missingWireIns(relFile, onDisk);
+    if (dropped.length > 0) wireInBroken.push(`${relFile} (${dropped.join(', ')})`);
+  }
+  if (wireInBroken.length > 0) {
+    console.error(`\nOPTIMIZE WIRE-IN BROKEN! Reverting all changes: ${wireInBroken.join('; ')}`);
+    for (const [file, backup] of backups) {
+      if (backup !== null) fs.writeFileSync(path.join(ROOT, file), backup);
+    }
     console.error('All changes reverted. Release will proceed with existing code.');
     process.exit(2);
   }
